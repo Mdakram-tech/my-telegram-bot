@@ -65,7 +65,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 3. TeraBox API URL Extractor
 def get_terabox_download_url(terabox_url):
     try:
-        # Note: If you made your own Cloudflare worker, put its link here
+        # Note: If you made your own Cloudflare worker, replace this link with yours
         api_url = f"https://api.teraboxdownloader.workers.dev/?url={terabox_url}"
         response = requests.get(api_url, timeout=15)
         if response.status_code == 200:
@@ -80,7 +80,7 @@ def get_terabox_download_url(terabox_url):
 async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
-    # Link Validation Fix: Stops the bot from treating text/commands as links
+    # Link Validation Fix: Stops the bot from treating commands/text as links
     if not url.startswith("http://") and not url.startswith("https://"):
         await update.message.reply_text(
             "⚠️ **Invalid Link!**\n\n"
@@ -180,4 +180,19 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
     except Exception as e:
         print(f"Error: {e}")
-        await status_message.edit_text("Sorry, this link could not be downloaded or the file is
+        await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
+
+# 5. Application Launch Configuration
+def main():
+    TOKEN = "8885032483:AAEP39aEEg69lMYQ1veslKOi4ztbDRk0grY"
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_click))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_and_send_video))
+
+    print("Bot is running with buttons and long video support...")
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
