@@ -75,16 +75,14 @@ def get_terabox_download_url(terabox_url):
         pass
     return None
 
-# ✨ NEW: TikTok API Bypass Extractor (Cloudflare Server Check Block Removal)
+# TikTok API Bypass Extractor
 def get_tiktok_download_url(tiktok_url):
     try:
-        # Posing requests through an open bypass API endpoint for TikTok
         api_url = f"https://www.tikwm.com/api/?url={tiktok_url}"
         response = requests.get(api_url, timeout=15)
         if response.status_code == 200:
             res_data = response.json()
             if res_data.get("code") == 0 and "data" in res_data:
-                # Returns direct no-watermark video link
                 return res_data["data"]["play"]
     except Exception as e:
         print(f"TikTok API Extraction Error: {e}")
@@ -106,8 +104,8 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
     status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
 
-    # 🚀 HIGH-SPEED TIKTOK BYPASS FLOW
-    if "tiktok.com" in url:
+    # 🚀 TIKTOK BYPASS (Har Tarah Ke Link Format Ke Liye Fix: vt, vm, short)
+    if "tiktok.com" in url or "vttiktok" in url:
         loop = asyncio.get_event_loop()
         direct_video_url = await loop.run_in_executor(None, get_tiktok_download_url, url)
         
@@ -115,7 +113,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
             try:
                 await update.message.reply_video(
                     video=direct_video_url,
-                    caption=" Done! 🎉 Your TikTok Video (No Watermark).",
+                    caption="Done! 🎉 Your TikTok Video (No Watermark).",
                     read_timeout=300,
                     write_timeout=300
                 )
@@ -128,7 +126,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                 )
                 return
             except Exception as e:
-                print(f"Failed sending TikTok video direct stream: {e}")
+                print(f"Failed sending TikTok video: {e}")
                 
         await status_message.edit_text("Sorry, this TikTok link could not be downloaded or processed right now.")
         return
