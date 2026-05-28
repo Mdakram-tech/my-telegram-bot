@@ -75,6 +75,21 @@ def get_terabox_download_url(terabox_url):
         pass
     return None
 
+# ✨ NEW: TikTok API Bypass Extractor (Cloudflare Server Check Block Removal)
+def get_tiktok_download_url(tiktok_url):
+    try:
+        # Posing requests through an open bypass API endpoint for TikTok
+        api_url = f"https://www.tikwm.com/api/?url={tiktok_url}"
+        response = requests.get(api_url, timeout=15)
+        if response.status_code == 200:
+            res_data = response.json()
+            if res_data.get("code") == 0 and "data" in res_data:
+                # Returns direct no-watermark video link
+                return res_data["data"]["play"]
+    except Exception as e:
+        print(f"TikTok API Extraction Error: {e}")
+    return None
+
 # 4. Main Downloader Function
 async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
@@ -90,6 +105,33 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         return
 
     status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
+
+    # 🚀 HIGH-SPEED TIKTOK BYPASS FLOW
+    if "tiktok.com" in url:
+        loop = asyncio.get_event_loop()
+        direct_video_url = await loop.run_in_executor(None, get_tiktok_download_url, url)
+        
+        if direct_video_url:
+            try:
+                await update.message.reply_video(
+                    video=direct_video_url,
+                    caption=" Done! 🎉 Your TikTok Video (No Watermark).",
+                    read_timeout=300,
+                    write_timeout=300
+                )
+                await status_message.delete()
+                
+                # Auto-repeat prompt
+                await update.message.reply_text(
+                    "What would you like to do next? Choose an option below:",
+                    reply_markup=get_main_keyboard()
+                )
+                return
+            except Exception as e:
+                print(f"Failed sending TikTok video direct stream: {e}")
+                
+        await status_message.edit_text("Sorry, this TikTok link could not be downloaded or processed right now.")
+        return
 
     # TeraBox Link Support
     if "terabox" in url or "nephobox" in url or "4shared" in url or "mirrobox" in url:
@@ -131,7 +173,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
         return
 
-    # Standard Platforms Configuration (With TikTok Support & Bypass Headers)
+    # Standard Platforms Configuration (YouTube, Instagram, Facebook)
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -139,11 +181,6 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         'socket_timeout': 120,   
         'retries': 15,          
         'restrictfilenames': True,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-        }
     }
 
     try:
