@@ -1,7 +1,7 @@
 import os
 import asyncio
 import requests
-import yt_dlp  # Fixed: Missing import add kiya
+import yt_dlp  
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
@@ -9,8 +9,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
 
-# 1. Start Command (Buttons ke sath)
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Global Keyboard for easy repeat
+def get_main_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("🇮🇳 Hindi / Urdu", callback_data='lang_hi'),
@@ -21,48 +21,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📢 About Bot", callback_data='about_bot')
         ]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    return InlineKeyboardMarkup(keyboard)
 
+# 1. Start Command (Fully English Welcome)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply_markup = get_main_keyboard()
     await update.message.reply_text(
-        "👋 Sallam / Welcome!\n\n"
-        "Please select your language or choose an option below:\n"
-        "Koshish karen ke pehle apni zaban select kar lein 👇",
+        "👋 Welcome to All Video Downloader Bot!\n\n"
+        "Please select your language or choose an option below 👇",
         reply_markup=reply_markup
     )
 
-# 2. Buttons Par Click Hone Ke Baad Kya Hoga
+# 2. Buttons Click Responses (Fully English)
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     if query.data == 'lang_hi':
         await query.edit_message_text(
-            text="✅ **Zaban: Hindi / Urdu** select ho gayi hai.\n\n"
-                 "📥 Ab aap kisi bhi video (YouTube, Instagram, Facebook) ka link yahan send karen, mein download kar doonga!"
+            text="✅ **Language: Hindi / Urdu** has been selected.\n\n"
+                 "📥 Now send any video link (YouTube, Instagram, Facebook), and I will download it for you!"
         )
     elif query.data == 'lang_en':
         await query.edit_message_text(
             text="✅ **Language: English** has been selected.\n\n"
-                 "📥 Now send any video link (YouTube, Instagram, Facebook) here, and I will download it for you!"
+                 "📥 Now send any video link (YouTube, Instagram, Facebook), and I will download it for you!"
         )
     elif query.data == 'help_info':
         await query.edit_message_text(
-            text="❓ **Madad / Help:**\n\n"
-                 "1. Kisi bhi video ka share link copy karen.\n"
-                 "2. Is chat mein paste karke send kar den.\n"
-                 "3. Bot automatic process karke video bhej dega.\n\n"
-                 "🔙 Wapas jaane ke liye /start likhen."
+            text="❓ **Help / Instructions:**\n\n"
+                 "1. Copy the share link of any video.\n"
+                 "2. Paste and send the link in this chat.\n"
+                 "3. The bot will automatically process and send the video.\n\n"
+                 "🔙 Type /start to go back to the main menu."
         )
     elif query.data == 'about_bot':
         await query.edit_message_text(
             text="🤖 **About Bot:**\n\n"
-                 "Yeh ek High-Speed Video Downloader bot hai jo bilkul free hai.\n"
+                 "This is a High-Speed Video Downloader bot, completely free to use.\n"
                  "Developed by: Mohammed Akram ✨"
         )
 
-# 3. TeraBox Helper
+# 3. TeraBox Helper (Change the URL below if you made a custom Cloudflare Worker)
 def get_terabox_download_url(terabox_url):
     try:
+        # If you deployed Cloudflare Worker, replace this URL with your Cloudflare link
         api_url = f"https://api.teraboxdownloader.workers.dev/?url={terabox_url}"
         response = requests.get(api_url, timeout=15)
         if response.status_code == 200:
@@ -73,43 +76,52 @@ def get_terabox_download_url(terabox_url):
         pass
     return None
 
-# 4. Main Downloader Function (Long Video Timeouts Fixed)
+# 4. Main Downloader Function (With Auto-Repeat Questions Feature)
 async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
-    status_message = await update.message.reply_text("Processing video... Badi videos mein thoda zyada time lag sakta hai ⏳")
+    status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
 
-  # TeraBox Handling (With Smart Link Bypass)
+    # TeraBox Handling (With Smart Bypass Button)
     if "terabox" in url or "nephobox" in url or "4shared" in url or "mirrobox" in url:
         loop = asyncio.get_event_loop()
         direct_link = await loop.run_in_executor(None, get_terabox_download_url, url)
         
         if direct_link:
             try:
-                # Pehle koshish karega video bhejne ki
                 await update.message.reply_video(
                     video=direct_link, 
-                    caption="🚀 **Aapki TeraBox Video!**\n\n💡 *Tip: Agar video show nahi ho rahi, to niche diye gaye link se direct download kar lein.*",
+                    caption="🚀 **Your TeraBox Video!**",
                     read_timeout=300,
                     write_timeout=300
                 )
                 await status_message.delete()
-                return
-            except Exception as e:
-                # Agar video 50MB se badi hui ya Telegram ne block kiya, to direct download button bhej dega
-                print(f"Telegram Video Send Failed, sending link instead: {e}")
                 
+                # --- AUTO REPEAT QUESTIONS AFTER SUCCESS ---
+                await update.message.reply_text(
+                    "What would you like to do next? Choose an option below:",
+                    reply_markup=get_main_keyboard()
+                )
+                return
+            except Exception:
+                # If file is over 50MB Telegram limit, send direct download button
                 keyboard = [[InlineKeyboardButton("📥 Download Video File", url=direct_link)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await status_message.edit_text(
-                    "⚠️ **File Size Bada Hai!**\n\n"
-                    "Yeh video Telegram ki 50MB limit se badi hai, isliye mein isey direct chat mein nahi bhej sakta.\n\n"
-                    "👉 Aap niche diye gaye button par click karke isey high-speed mein direct download kar sakte hain!",
+                    "⚠️ **File Size Too Large!**\n\n"
+                    "This video exceeds Telegram's 50MB limit for direct transfer.\n\n"
+                    "👉 Click the button below to download it directly at full speed!",
                     reply_markup=reply_markup
+                )
+                
+                # --- AUTO REPEAT QUESTIONS AFTER LINK SEND ---
+                await update.message.reply_text(
+                    "Ready for the next video? Choose an option:",
+                    reply_markup=get_main_keyboard()
                 )
                 return
         
-        await status_message.edit_text("Maaf kijiyega, TeraBox ki API abhi down hai ya yeh link private hai. Koshish karen ke YouTube/Instagram links use karen.")
+        await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
         return
 
     # Normal Platforms (YouTube, Insta, FB)
@@ -117,8 +129,8 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
-        'socket_timeout': 120,   # Network timeout ko 2 minute kiya taake bada file connection drop na ho
-        'retries': 15,          # Retries badha di
+        'socket_timeout': 120,   
+        'retries': 15,          
         'restrictfilenames': True,
     }
 
@@ -136,13 +148,12 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
             if os.path.exists(f"{base_path}.mp4"): file_path = f"{base_path}.mp4"
             elif os.path.exists(f"{base_path}.mkv"): file_path = f"{base_path}.mkv"
 
-        await status_message.edit_text("Video download ho chuki hai! Ab Telegram par upload ho rahi hai... 📤")
+        await status_message.edit_text("Video downloaded successfully! Uploading to Telegram... 📤")
         
-        # Badi files upload karne ke liye read/write timeouts ko 10-10 minute (600s) kar diya
         with open(file_path, 'rb') as video_file:
             await update.message.reply_video(
                 video=video_file, 
-                caption="Done! 🎉 Aapki Video Tayar Hai.",
+                caption="Done! 🎉 Your video is ready.",
                 read_timeout=600,  
                 write_timeout=600  
             )
@@ -150,23 +161,26 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         os.remove(file_path)
         await status_message.delete()
 
+        # --- AUTO REPEAT QUESTIONS AFTER SUCCESS ---
+        await update.message.reply_text(
+            "What would you like to do next? Choose an option below:",
+            reply_markup=get_main_keyboard()
+        )
+
     except Exception as e:
         print(f"Error: {e}")
-        await status_message.edit_text("Maaf kijiyega, is link se video download nahi ho saki ya file bohot badi hai.")
+        await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
 
-# 5. Main Application Configuration (Web Server Configuration Fixed)
+# 5. Main Application Configuration
 def main():
     TOKEN = "8885032483:AAEP39aEEg69lMYQ1veslKOi4ztbDRk0grY"
-    
-    # Base application build
     application = Application.builder().token(TOKEN).build()
 
-    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_and_send_video))
 
-    print("Bot chalu hai buttons aur long video support ke sath...")
+    print("Bot is running with buttons and long video support...")
     application.run_polling()
 
 if __name__ == '__main__':
