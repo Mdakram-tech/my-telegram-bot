@@ -40,19 +40,19 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == 'lang_hi':
         await query.edit_message_text(
             text="✅ **Language: Hindi / Urdu** has been selected.\n\n"
-                 "📥 Now send any video link (YouTube, Instagram, Facebook), and I will download it for you!"
+                 "📥 Now send any video link (YouTube, Instagram, Facebook, TikTok), and I will download it for you!"
         )
     elif query.data == 'lang_en':
         await query.edit_message_text(
             text="✅ **Language: English** has been selected.\n\n"
-                 "📥 Now send any video link (YouTube, Instagram, Facebook), and I will download it for you!"
+                 "📥 Now send any video link (YouTube, Instagram, Facebook, TikTok), and I will download it for you!"
         )
     elif query.data == 'help_info':
         await query.edit_message_text(
             text="❓ **Help / Instructions:**\n\n"
                  "1. Copy the share link of any video.\n"
                  "2. Paste and send the link in this chat.\n"
-                 "3. The bot will automatically process and send the video.\n\n"
+                 "3. Supported: YouTube, TikTok, Instagram, Facebook, TeraBox.\n\n"
                  "🔙 Type /start to go back to the main menu."
         )
     elif query.data == 'about_bot':
@@ -65,7 +65,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 3. TeraBox API URL Extractor
 def get_terabox_download_url(terabox_url):
     try:
-        # Note: If you made your own Cloudflare worker, replace this link with yours
         api_url = f"https://api.teraboxdownloader.workers.dev/?url={terabox_url}"
         response = requests.get(api_url, timeout=15)
         if response.status_code == 200:
@@ -76,15 +75,15 @@ def get_terabox_download_url(terabox_url):
         pass
     return None
 
-# 4. Main Downloader Function (Handles link safety & loops back)
+# 4. Main Downloader Function
 async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
-    # Link Validation Fix: Stops the bot from treating commands/text as links
+    # Link Validation Fix
     if not url.startswith("http://") and not url.startswith("https://"):
         await update.message.reply_text(
             "⚠️ **Invalid Link!**\n\n"
-            "Please send a valid video URL (e.g., YouTube, Instagram, Facebook, or TeraBox link).\n"
+            "Please send a valid video URL (e.g., YouTube, TikTok, Instagram, Facebook, or TeraBox link).\n"
             "Make sure it starts with http:// or https://",
             reply_markup=get_main_keyboard()
         )
@@ -92,7 +91,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
     status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
 
-    # TeraBox Link Support (With Smart Direct Download Button Bypass)
+    # TeraBox Link Support
     if "terabox" in url or "nephobox" in url or "4shared" in url or "mirrobox" in url:
         loop = asyncio.get_event_loop()
         direct_link = await loop.run_in_executor(None, get_terabox_download_url, url)
@@ -107,14 +106,12 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                 )
                 await status_message.delete()
                 
-                # Auto-repeat prompt after success
                 await update.message.reply_text(
                     "What would you like to do next? Choose an option below:",
                     reply_markup=get_main_keyboard()
                 )
                 return
             except Exception:
-                # Triggers if video size exceeds Telegram's 50MB bot API download capability
                 keyboard = [[InlineKeyboardButton("📥 Download Video File", url=direct_link)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -125,7 +122,6 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                     reply_markup=reply_markup
                 )
                 
-                # Auto-repeat prompt after providing alternative link
                 await update.message.reply_text(
                     "Ready for the next video? Choose an option:",
                     reply_markup=get_main_keyboard()
@@ -135,7 +131,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
         return
 
-    # Standard Platforms Configuration (YouTube, Instagram, Facebook)
+    # Standard Platforms Configuration (With TikTok Support Optimizations)
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -172,7 +168,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         os.remove(file_path)
         await status_message.delete()
 
-        # Auto-repeat prompt after standard platform success
+        # Auto-repeat prompt
         await update.message.reply_text(
             "What would you like to do next? Choose an option below:",
             reply_markup=get_main_keyboard()
