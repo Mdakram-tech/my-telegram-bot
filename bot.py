@@ -78,24 +78,38 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
     url = update.message.text
     status_message = await update.message.reply_text("Processing video... Badi videos mein thoda zyada time lag sakta hai ⏳")
 
-    # TeraBox Handling
-    if "terabox" in url or "nephobox" in url or "4shared" in url:
+  # TeraBox Handling (With Smart Link Bypass)
+    if "terabox" in url or "nephobox" in url or "4shared" in url or "mirrobox" in url:
         loop = asyncio.get_event_loop()
         direct_link = await loop.run_in_executor(None, get_terabox_download_url, url)
+        
         if direct_link:
             try:
-                # Long video timeout protection for TeraBox direct links
+                # Pehle koshish karega video bhejne ki
                 await update.message.reply_video(
                     video=direct_link, 
-                    caption="Aapki TeraBox Video!",
-                    read_timeout=600,
-                    write_timeout=600
+                    caption="🚀 **Aapki TeraBox Video!**\n\n💡 *Tip: Agar video show nahi ho rahi, to niche diye gaye link se direct download kar lein.*",
+                    read_timeout=300,
+                    write_timeout=300
                 )
                 await status_message.delete()
                 return
-            except Exception:
-                pass
-        await status_message.edit_text("Error processing TeraBox link.")
+            except Exception as e:
+                # Agar video 50MB se badi hui ya Telegram ne block kiya, to direct download button bhej dega
+                print(f"Telegram Video Send Failed, sending link instead: {e}")
+                
+                keyboard = [[InlineKeyboardButton("📥 Download Video File", url=direct_link)]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await status_message.edit_text(
+                    "⚠️ **File Size Bada Hai!**\n\n"
+                    "Yeh video Telegram ki 50MB limit se badi hai, isliye mein isey direct chat mein nahi bhej sakta.\n\n"
+                    "👉 Aap niche diye gaye button par click karke isey high-speed mein direct download kar sakte hain!",
+                    reply_markup=reply_markup
+                )
+                return
+        
+        await status_message.edit_text("Maaf kijiyega, TeraBox ki API abhi down hai ya yeh link private hai. Koshish karen ke YouTube/Instagram links use karen.")
         return
 
     # Normal Platforms (YouTube, Insta, FB)
