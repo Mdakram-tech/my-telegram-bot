@@ -1,5 +1,8 @@
 import os
 import asyncio
+import threading
+import http.server
+import socketserver
 import requests
 import yt_dlp  
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -92,7 +95,6 @@ def get_tiktok_download_url(tiktok_url):
 async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
-    # Link Validation Fix
     if not url.startswith("http://") and not url.startswith("https://"):
         await update.message.reply_text(
             "⚠️ **Invalid Link!**\n\n"
@@ -104,7 +106,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
     status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
 
-    # 🚀 TIKTOK BYPASS (Har Tarah Ke Link Format Ke Liye Fix: vt, vm, short)
+    # TIKTOK BYPASS
     if "tiktok.com" in url or "vttiktok" in url:
         loop = asyncio.get_event_loop()
         direct_video_url = await loop.run_in_executor(None, get_tiktok_download_url, url)
@@ -119,7 +121,6 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                 )
                 await status_message.delete()
                 
-                # Auto-repeat prompt
                 await update.message.reply_text(
                     "What would you like to do next? Choose an option below:",
                     reply_markup=get_main_keyboard()
@@ -171,7 +172,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
         return
 
-    # Standard Platforms Configuration (YouTube, Instagram, Facebook)
+    # Standard Platforms Configuration
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -208,7 +209,6 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         os.remove(file_path)
         await status_message.delete()
 
-        # Auto-repeat prompt
         await update.message.reply_text(
             "What would you like to do next? Choose an option below:",
             reply_markup=get_main_keyboard()
@@ -218,8 +218,21 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         print(f"Error: {e}")
         await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
 
+# ✨ FAKE WEB SERVER FOR RENDER PORT BYPASS
+def run_fake_server():
+    PORT = int(os.environ.get("PORT", 10000))
+    Handler = http.server.SimpleHTTPRequestHandler
+    # Solves Render's "No open ports detected" issue
+    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+        print(f"Fake Server running on port {PORT} for Render dummy check...")
+        httpd.serve_forever()
+
 # 5. Application Launch Configuration
 def main():
+    # Start the fake web server in a background thread so it doesn't block the bot
+    server_thread = threading.Thread(target=run_fake_server, daemon=True)
+    server_thread.start()
+
     TOKEN = "8885032483:AAEP39aEEg69lMYQ1veslKOi4ztbDRk0grY"
     application = Application.builder().token(TOKEN).build()
 
