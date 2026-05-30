@@ -222,7 +222,6 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 def run_fake_server():
     PORT = int(os.environ.get("PORT", 10000))
     Handler = http.server.SimpleHTTPRequestHandler
-    # Solves Render's "No open ports detected" issue
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         print(f"Fake Server running on port {PORT} for Render dummy check...")
         httpd.serve_forever()
@@ -233,7 +232,8 @@ def main():
     server_thread = threading.Thread(target=run_fake_server, daemon=True)
     server_thread.start()
 
-    TOKEN = "8885032483:AAEP39aEEg69lMYQ1veslKOi4ztbDRk0grY"
+    # ✨ AAPKI NAYI BOT TOKEN ADD KAR DI HAI 👇 ✨
+    TOKEN = "8736787194:AAHXkUHKoGY0ft-sLAFUdtlUYbispkG93RI"
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
