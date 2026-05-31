@@ -218,7 +218,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         print(f"Error: {e}")
         await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
 
-# ✨ FAKE WEB SERVER FOR RENDER PORT BYPASS
+# FAKE WEB SERVER FOR RENDER PORT BYPASS
 def run_fake_server():
     PORT = int(os.environ.get("PORT", 10000))
     Handler = http.server.SimpleHTTPRequestHandler
@@ -232,7 +232,7 @@ def main():
     server_thread = threading.Thread(target=run_fake_server, daemon=True)
     server_thread.start()
 
-    # ✨ AAPKI NAYI BOT TOKEN ADD KAR DI HAI 👇 ✨
+    # ✨ Aapki nayi fresh token yahan set hai 👇 ✨
     TOKEN = "8736787194:AAHXkUHKoGY0ft-sLAFUdtlUYbispkG93RI"
     application = Application.builder().token(TOKEN).build()
 
@@ -241,7 +241,9 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_and_send_video))
 
     print("Bot is running with buttons and long video support...")
-    application.run_polling()
+    
+    # 🔥 FIX: Yeh line purane atke hue pending background updates ko drop kar degi!
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
