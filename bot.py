@@ -65,7 +65,22 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  "Developed by: Mohammed Akram ✨"
         )
 
-# 3. TeraBox API URL Extractor
+# YouTube API Bypass Extractor
+def get_youtube_download_url(youtube_url):
+    try:
+        # Using a reliable public fast-api for direct mp4 links
+        api_url = f"https://api.v02.savetube.me/download/video?url={youtube_url}"
+        response = requests.get(api_url, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == True and "data" in data:
+                # Get the highest quality available direct link
+                return data["data"]["download_url"]
+    except Exception as e:
+        print(f"YouTube API Bypass Error: {e}")
+    return None
+
+# TeraBox API URL Extractor
 def get_terabox_download_url(terabox_url):
     try:
         api_url = f"https://api.teraboxdownloader.workers.dev/?url={terabox_url}"
@@ -106,6 +121,25 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
     status_message = await update.message.reply_text("Processing video... Large videos might take a little longer ⏳")
 
+    # 🔥 YOUTUBE & SHORTS DIRECT API BYPASS
+    if "youtube.com" in url or "youtu.be" in url:
+        loop = asyncio.get_event_loop()
+        direct_yt_url = await loop.run_in_executor(None, get_youtube_download_url, url)
+        
+        if direct_yt_url:
+            try:
+                await update.message.reply_video(
+                    video=direct_yt_url,
+                    caption="Done! 🎉 Your YouTube Video.",
+                    read_timeout=300,
+                    write_timeout=300
+                )
+                await status_message.delete()
+                await update.message.reply_text("Ready for the next link? 👇", reply_markup=get_main_keyboard())
+                return
+            except Exception as e:
+                print(f"Direct stream send failed: {e}")
+
     # TIKTOK BYPASS
     if "tiktok.com" in url or "vttiktok" in url:
         loop = asyncio.get_event_loop()
@@ -120,16 +154,12 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                     write_timeout=300
                 )
                 await status_message.delete()
-                
-                await update.message.reply_text(
-                    "What would you like to do next? Choose an option below:",
-                    reply_markup=get_main_keyboard()
-                )
+                await update.message.reply_text("What would you like to do next?", reply_markup=get_main_keyboard())
                 return
             except Exception as e:
                 print(f"Failed sending TikTok video: {e}")
                 
-        await status_message.edit_text("Sorry, this TikTok link could not be downloaded or processed right now.")
+        await status_message.edit_text("Sorry, this TikTok link could not be downloaded right now.")
         return
 
     # TeraBox Link Support
@@ -146,35 +176,22 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
                     write_timeout=300
                 )
                 await status_message.delete()
-                
-                await update.message.reply_text(
-                    "What would you like to do next? Choose an option below:",
-                    reply_markup=get_main_keyboard()
-                )
+                await update.message.reply_text("Ready for next link?", reply_markup=get_main_keyboard())
                 return
             except Exception:
                 keyboard = [[InlineKeyboardButton("📥 Download Video File", url=direct_link)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
                 await status_message.edit_text(
-                    "⚠️ **File Size Too Large!**\n\n"
-                    "This video exceeds Telegram's 50MB limit for direct video transfers.\n\n"
-                    "👉 Click the button below to download it directly at full speed!",
+                    "⚠️ **File Size Too Large!**\n\nThis video exceeds Telegram's 50MB limit.\nClick below to download directly!",
                     reply_markup=reply_markup
                 )
-                
-                await update.message.reply_text(
-                    "Ready for the next video? Choose an option:",
-                    reply_markup=get_main_keyboard()
-                )
                 return
-        
-        await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
+        await status_message.edit_text("Sorry, unable to process this TeraBox link.")
         return
 
-    # Standard Platforms Configuration (Optimized formats for cloud servers like Render)
+    # Standard Platforms Fallback Configuration (Instagram/Facebook)
     ydl_opts = {
-        'format': 'best[ext=mp4]/best', # Simplified format to prevent merge/FFmpeg failure
+        'format': 'best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
         'socket_timeout': 60,   
@@ -196,7 +213,7 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
             if os.path.exists(f"{base_path}.mp4"): file_path = f"{base_path}.mp4"
             elif os.path.exists(f"{base_path}.mkv"): file_path = f"{base_path}.mkv"
 
-        await status_message.edit_text("Video downloaded successfully! Uploading to Telegram... 📤")
+        await status_message.edit_text("Video downloaded successfully! Uploading... 📤")
         
         with open(file_path, 'rb') as video_file:
             await update.message.reply_video(
@@ -208,45 +225,10 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
 
         os.remove(file_path)
         await status_message.delete()
-
-        await update.message.reply_text(
-            "What would you like to do next? Choose an option below:",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("Choose an option below:", reply_markup=get_main_keyboard())
 
     except Exception as e:
-        print(f"Standard Download Error: {e}")
-        # 🔥 SECONDARY BYPASS MODE FOR YOUTUBE/SHORTS SHIELD
-        try:
-            await status_message.edit_text("Applying Cloud Server Bypass Extraction... ⚡")
-            
-            # Requesting basic single-stream stream directly using basic yt-dlp lookup
-            bypass_opts = {
-                'format': 'worst[ext=mp4]/best',
-                'quiet': True,
-                'skip_download': True
-            }
-            
-            def get_direct_stream():
-                with yt_dlp.YoutubeDL(bypass_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    return info.get('url', None)
-
-            direct_stream_url = await loop.run_in_executor(None, get_direct_stream)
-            
-            if direct_stream_url:
-                await update.message.reply_video(
-                    video=direct_stream_url,
-                    caption="Done! 🎉 (Downloaded via Cloud Bypass Mode)",
-                    read_timeout=300,
-                    write_timeout=300
-                )
-                await status_message.delete()
-                await update.message.reply_text("Ready for the next link? 👇", reply_markup=get_main_keyboard())
-                return
-        except Exception as fallback_err:
-            print(f"Fallback also failed: {fallback_err}")
-            
+        print(f"Error: {e}")
         await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
 
 # FAKE WEB SERVER FOR RENDER PORT BYPASS
