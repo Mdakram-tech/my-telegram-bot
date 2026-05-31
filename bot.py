@@ -172,13 +172,13 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         await status_message.edit_text("Sorry, unable to process this TeraBox link. Please make sure the link is public.")
         return
 
-    # Standard Platforms Configuration
+    # Standard Platforms Configuration (Optimized formats for cloud servers like Render)
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'best[ext=mp4]/best', # Simplified format to prevent merge/FFmpeg failure
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
-        'socket_timeout': 120,   
-        'retries': 15,          
+        'socket_timeout': 60,   
+        'retries': 10,          
         'restrictfilenames': True,
     }
 
@@ -215,7 +215,38 @@ async def download_and_send_video(update: Update, context: ContextTypes.DEFAULT_
         )
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Standard Download Error: {e}")
+        # 🔥 SECONDARY BYPASS MODE FOR YOUTUBE/SHORTS SHIELD
+        try:
+            await status_message.edit_text("Applying Cloud Server Bypass Extraction... ⚡")
+            
+            # Requesting basic single-stream stream directly using basic yt-dlp lookup
+            bypass_opts = {
+                'format': 'worst[ext=mp4]/best',
+                'quiet': True,
+                'skip_download': True
+            }
+            
+            def get_direct_stream():
+                with yt_dlp.YoutubeDL(bypass_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    return info.get('url', None)
+
+            direct_stream_url = await loop.run_in_executor(None, get_direct_stream)
+            
+            if direct_stream_url:
+                await update.message.reply_video(
+                    video=direct_stream_url,
+                    caption="Done! 🎉 (Downloaded via Cloud Bypass Mode)",
+                    read_timeout=300,
+                    write_timeout=300
+                )
+                await status_message.delete()
+                await update.message.reply_text("Ready for the next link? 👇", reply_markup=get_main_keyboard())
+                return
+        except Exception as fallback_err:
+            print(f"Fallback also failed: {fallback_err}")
+            
         await status_message.edit_text("Sorry, this link could not be downloaded or the file is too large.")
 
 # FAKE WEB SERVER FOR RENDER PORT BYPASS
@@ -228,11 +259,9 @@ def run_fake_server():
 
 # 5. Application Launch Configuration
 def main():
-    # Start the fake web server in a background thread so it doesn't block the bot
     server_thread = threading.Thread(target=run_fake_server, daemon=True)
     server_thread.start()
 
-    # ✨ Aapki nayi fresh token yahan set hai 👇 ✨
     TOKEN = "8736787194:AAHXkUHKoGY0ft-sLAFUdtlUYbispkG93RI"
     application = Application.builder().token(TOKEN).build()
 
@@ -241,8 +270,6 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_and_send_video))
 
     print("Bot is running with buttons and long video support...")
-    
-    # 🔥 FIX: Yeh line purane atke hue pending background updates ko drop kar degi!
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
